@@ -2,28 +2,35 @@
 
 Simple terminal tool for downloading YouTube videos via [yt-dlp](https://github.com/yt-dlp/yt-dlp). Pass URLs directly or feed in a text file with one URL per line.
 
-## What gets installed automatically vs. manually
-
-The Python dependency (`yt-dlp`) is installed automatically into a local virtual environment (`.venv/`) on first run. **System dependencies** must be installed manually, because they're not Python packages:
-
-| Dependency | Why it's needed | Install command |
-|---|---|---|
-| **Python 3.10+** | Required by yt-dlp (3.9 was deprecated) | macOS: `brew install python@3.13` <br> Linux: `sudo apt install python3.13 python3.13-venv` |
-| **ffmpeg** | Merges separate video + audio streams into one MP4 | macOS: `brew install ffmpeg` <br> Linux: `sudo apt install ffmpeg` |
-| **bash** | Runs the wrapper script | Pre-installed on macOS/Linux |
-
 ## Setup on a new machine
+
+Two steps — like `npm install` then `npm run`:
 
 ```bash
 git clone <repo-url>
 cd download-youtube
-chmod +x download.sh
+chmod +x install.sh download.sh
+
+# Step 1: install everything (system + Python deps)
+./install.sh
+
+# Step 2: download
+./download.sh "https://youtu.be/VIDEO_ID"
 ```
 
-That's it — the first run of `./download.sh` will:
-1. Detect a Python 3.10+ interpreter
-2. Create `.venv/` in the project folder
-3. Install `yt-dlp` from `requirements.txt`
+### What `install.sh` does
+
+It checks for and installs everything needed:
+
+| Dependency | Why it's needed | Auto-installed by |
+|---|---|---|
+| **Python 3.10+** | Required by yt-dlp | `brew install python@3.13` (macOS) or `sudo apt install python3.13 python3.13-venv` (Linux) |
+| **ffmpeg** | Merges video + audio streams into one MP4 | `brew install ffmpeg` (macOS) or `sudo apt install ffmpeg` (Linux) |
+| **yt-dlp** | The actual downloader | `pip install` into local `.venv/` |
+
+Supported platforms: **macOS** (via Homebrew) and **Debian/Ubuntu Linux** (via apt). On other systems, install Python 3.10+ and ffmpeg manually, then re-run `./install.sh` — it will skip what's already there and just create the venv.
+
+After `install.sh` finishes, everything lives in `.venv/` — `download.sh` runs from there with no further setup.
 
 ## Usage
 
@@ -115,7 +122,8 @@ https://youtube.com/watch?v=ghi789
 
 ```
 download-youtube/
-├── download.sh         # Bash wrapper: manages venv, runs Python script
+├── install.sh          # One-time setup: installs system deps + creates venv
+├── download.sh         # Runs the downloader from .venv/
 ├── download.py         # Python script: parses args, calls yt-dlp
 ├── requirements.txt    # Python dependencies (yt-dlp)
 ├── .gitignore          # Excludes .venv/ and downloaded media
@@ -124,13 +132,15 @@ download-youtube/
 
 ## Troubleshooting
 
-**`Python 3.10+ not found`** — Install Python via the commands in the table above, then re-run.
+**`Error: virtual environment not found`** — Run `./install.sh` first.
 
-**`Warning: ffmpeg not found`** — Videos may download as separate video/audio files instead of merged MP4. Install ffmpeg.
+**`Error: Homebrew is required`** (macOS) — Install Homebrew from https://brew.sh, then re-run `./install.sh`.
 
-**`HTTP Error 403: Forbidden` or `Requested format is not available`** — YouTube changed something. Update yt-dlp:
+**`HTTP Error 403: Forbidden` or `Requested format is not available`** — YouTube changed something. Refresh the deps:
 ```bash
-.venv/bin/pip install --upgrade 'yt-dlp[default]'
+.venv/bin/pip install --upgrade -r requirements.txt
 ```
 
 **Resuming an interrupted download** — Just re-run the same command. yt-dlp picks up from `.part` files automatically.
+
+**Starting over from scratch** — Delete `.venv/` and re-run `./install.sh`.
