@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Downloaded media
+*.mp4
+*.mkv
+*.webm
+*.m4a
+*.mp3
+*.part
+*.ytdl
+.claude

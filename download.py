@@ -1,5 +1,6 @@
-import sys
+import argparse
 import os
+import sys
 import yt_dlp
 
 
@@ -13,7 +14,8 @@ def download(url, output_dir):
         "extractor_args": {"youtube": {"player_client": ["android_vr", "web"]}},
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True)
+        return info.get("title", url)
 
 
 def read_links_from_file(filepath):
@@ -26,36 +28,96 @@ def read_links_from_file(filepath):
     return links
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage:")
-        print("  ./download.sh <youtube_url> [url2] [url3] ...")
-        print("  ./download.sh links.txt")
-        sys.exit(1)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        prog="download.sh",
+        description="Download YouTube videos via yt-dlp.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  ./download.sh "https://youtu.be/VIDEO_ID"
+  ./download.sh "URL1" "URL2" "URL3"
+  ./download.sh links.txt
+  ./download.sh -o ~/Downloads "URL1" "URL2"
+  ./download.sh --output /path/to/folder links.txt
+""",
+    )
+    parser.add_argument(
+        "inputs",
+        nargs="+",
+        help="YouTube URLs and/or paths to .txt files containing URLs",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        help="Folder to save downloads. "
+             "Defaults to the folder of the .txt file (if given) or current directory.",
+    )
+    return parser.parse_args()
 
+
+def resolve_inputs(inputs, output_override):
     links = []
-    output_dir = os.getcwd()
+    file_dir = None
 
-    for arg in sys.argv[1:]:
+    for arg in inputs:
         if os.path.isfile(arg):
-            output_dir = os.path.dirname(os.path.abspath(arg))
+            file_dir = os.path.dirname(os.path.abspath(arg))
             links.extend(read_links_from_file(arg))
         else:
             links.append(arg)
+
+    if output_override:
+        output_dir = os.path.abspath(os.path.expanduser(output_override))
+    elif file_dir:
+        output_dir = file_dir
+    else:
+        output_dir = os.getcwd()
+
+    return links, output_dir
+
+
+def main():
+    args = parse_args()
+    links, output_dir = resolve_inputs(args.inputs, args.output)
 
     if not links:
         print("No links found.")
         sys.exit(1)
 
-    print(f"Downloading {len(links)} video(s) to: {output_dir}\n")
+    os.makedirs(output_dir, exist_ok=True)
+
+    total = len(links)
+    bar = "=" * 60
+
+    print(bar)
+    print(f"Downloading {total} video(s)")
+    print(f"Destination: {output_dir}")
+    print(bar + "\n")
+
+    succeeded = []
+    failed = []
 
     for i, link in enumerate(links, 1):
-        print(f"[{i}/{len(links)}] {link}")
+        print(f"\n[{i}/{total}] {link}")
+        print("-" * 60)
         try:
-            download(link, output_dir)
-            print(f"  Done.\n")
+            title = download(link, output_dir)
+            succeeded.append((link, title))
+            print(f"\n  ✓ [{i}/{total}] Done: {title}")
         except Exception as e:
-            print(f"  Failed: {e}\n")
+            failed.append((link, str(e)))
+            print(f"\n  ✗ [{i}/{total}] Failed: {e}")
+
+    print("\n" + bar)
+    print(f"Summary: {len(succeeded)} succeeded, {len(failed)} failed (of {total})")
+    print(bar)
+
+    if failed:
+        print("\nFailed downloads:")
+        for link, err in failed:
+            print(f"  - {link}")
+            print(f"      {err}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
